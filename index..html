@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Krishna Medicose – Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --bg: #0b0b0b;
+        --card: #141414;
+        --orange: #ff8c24;
+        --orange-soft: #2a1a0a;
+        --text: #f5f5f5;
+        --muted: #9ca3af;
+        --success: #22c55e;
+        --danger: #ef4444;
+      }
+
+      * {
+        box-sizing: border-box;
+        font-family: Inter, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .container {
+        max-width: 1000px;
+        margin: auto;
+        padding: 16px;
+      }
+      h1 {
+        color: var(--orange);
+        margin-bottom: 6px;
+      }
+
+      .card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+
+      .small {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      input,
+      select {
+        width: 100%;
+        background: #0f0f0f;
+        border: 1px solid #262626;
+        color: white;
+        padding: 12px;
+        border-radius: 10px;
+      }
+
+      button {
+        border: none;
+        padding: 12px;
+        border-radius: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+      }
+
+      .primary {
+        background: var(--orange);
+      }
+      .secondary {
+        background: #1f1f1f;
+        color: var(--orange);
+      }
+      .danger {
+        background: #3a0d0d;
+        color: #f87171;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .badge {
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        margin-left: 6px;
+      }
+
+      .free {
+        background: #052e16;
+        color: #22c55e;
+      }
+      .booked {
+        background: #3f1d0f;
+        color: #f87171;
+      }
+
+      .slot,
+      .appointment {
+        border-bottom: 1px solid #262626;
+        padding: 12px 0;
+      }
+
+      .actions {
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>Admin Panel</h1>
+      <p class="small">Krishna Medicose</p>
+
+      <!-- CREATE SLOTS -->
+      <div class="card">
+        <h3>Create Slots</h3>
+        <input type="date" id="slotCreateDate" />
+        <button
+          class="primary"
+          style="margin-top: 10px"
+          onclick="createSlots()"
+        >
+          Create Slots
+        </button>
+        <p id="createMsg" class="small"></p>
+      </div>
+
+      <!-- VIEW / DELETE SLOTS -->
+      <div class="card">
+        <h3>Slots by Date</h3>
+        <input type="date" id="slotViewDate" />
+
+        <div class="actions">
+          <button class="secondary" onclick="getSlots()">Get Slots</button>
+          <button class="danger" onclick="deleteSlotsByDate()">
+            Delete All Slots
+          </button>
+        </div>
+
+        <div id="slotsList" style="margin-top: 12px"></div>
+      </div>
+
+      <!-- APPOINTMENT FILTERS -->
+      <div class="card">
+        <h3>Appointments</h3>
+
+        <div class="row">
+          <select id="paymentFilter">
+            <option value="">All Payments</option>
+            <option value="PAID">Paid</option>
+            <option value="PENDING">Pending</option>
+          </select>
+
+          <select id="meetingFilter">
+            <option value="">All Meetings</option>
+            <option value="true">Meeting Given</option>
+            <option value="false">Meeting Not Given</option>
+          </select>
+        </div>
+
+        <button
+          class="primary"
+          style="margin-top: 10px"
+          onclick="fetchAppointments()"
+        >
+          Apply Filters
+        </button>
+      </div>
+
+      <!-- APPOINTMENTS LIST -->
+      <div class="card" id="appointmentsList"></div>
+    </div>
+
+    <script>
+      const BASE_URL = "http://localhost:5000";
+
+      const today = new Date().toISOString().split("T")[0];
+      slotCreateDate.min = today;
+      slotViewDate.min = today;
+
+      async function createSlots() {
+        const date = slotCreateDate.value;
+        if (!date) return alert("Select date");
+
+        const res = await fetch(`${BASE_URL}/api/slots/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date }),
+        });
+
+        const data = await res.json();
+        createMsg.innerText = data.message || "Done";
+      }
+
+      async function getSlots() {
+        const date = slotViewDate.value;
+        if (!date) return alert("Select date");
+
+        slotsList.innerHTML = "<p class='small'>Loading slots...</p>";
+
+        const res = await fetch(`${BASE_URL}/api/slots/available?date=${date}`);
+        const result = await res.json();
+        const slots = result.data || [];
+
+        slotsList.innerHTML = "";
+
+        if (!slots.length) {
+          slotsList.innerHTML = "<p class='small'>No slots found</p>";
+          return;
+        }
+
+        slots.forEach((s) => {
+          const div = document.createElement("div");
+          div.className = "slot";
+
+          const start = new Date(s.startTime).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          const end = new Date(s.endTime).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+
+          div.innerHTML = `
+            <strong>${start} - ${end}</strong>
+            <span class="badge ${s.isBooked ? "booked" : "free"}">
+              ${s.isBooked ? "Booked" : "Free"}
+            </span>
+
+            <div class="actions">
+              <button class="danger" onclick="deleteSlot('${s._id}')">
+                Delete Slot
+              </button>
+            </div>
+          `;
+          slotsList.appendChild(div);
+        });
+      }
+
+      async function deleteSlot(id) {
+        if (!confirm("Delete this slot?")) return;
+        await fetch(`${BASE_URL}/api/slots/${id}`, { method: "DELETE" });
+        getSlots();
+      }
+
+      async function deleteSlotsByDate() {
+        const date = slotViewDate.value;
+        if (!date) return alert("Select date");
+        if (!confirm("Delete ALL slots for this date?")) return;
+
+        await fetch(`${BASE_URL}/api/slots/by-date/${date}`, {
+          method: "DELETE",
+        });
+        getSlots();
+      }
+
+      async function fetchAppointments() {
+        let url = `${BASE_URL}/api/appointments`;
+
+        const p = paymentFilter.value;
+        const m = meetingFilter.value;
+
+        const q = [];
+        if (p) q.push(`paymentStatus=${p}`);
+        if (m) q.push(`isMeetingLink=${m}`);
+        if (q.length) url += `?${q.join("&")}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        renderAppointments(data.data || []);
+      }
+
+      function renderAppointments(list) {
+        appointmentsList.innerHTML = "<h3>Appointments</h3>";
+
+        if (!list.length) {
+          appointmentsList.innerHTML += "<p class='small'>No records</p>";
+          return;
+        }
+
+        list.forEach((a) => {
+          const div = document.createElement("div");
+          div.className = "appointment";
+
+          div.innerHTML = `
+            <strong>${a.name}</strong> (${a.paymentStatus})
+            <div class="small">${a.email}</div>
+            <div class="small">${a.phoneNumber}</div>
+            <div class="small">UTR: ${a.utr || "-"}</div>
+
+            <input
+              placeholder="Meeting link"
+              id="m_${a._id}"
+              value="${a.meetingLink || ""}"
+            />
+
+            <button class="secondary" onclick="addMeeting('${a._id}')">
+              ${a.meetingLink ? "Update Meeting Link" : "Add Meeting Link"}
+            </button>
+          `;
+
+          appointmentsList.appendChild(div);
+        });
+      }
+
+      async function addMeeting(id) {
+        const link = document.getElementById(`m_${id}`).value.trim();
+        if (!link) return alert("Enter meeting link");
+
+        const res = await fetch(
+          `${BASE_URL}/api/appointments/${id}/meeting-link`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ meetingLink: link, notifyUser: true }),
+          }
+        );
+
+        const data = await res.json();
+        if (data.success) fetchAppointments();
+      }
+    </script>
+  </body>
+</html>
